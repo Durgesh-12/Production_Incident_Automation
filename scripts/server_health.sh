@@ -1,4 +1,13 @@
 #!/bin/bash
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+PROJECT_DIR="$(dirname "$SCRIPT_DIR")"
+REPORT_DIR="$PROJECT_DIR/reports"
+
+mkdir -p "$REPORT_DIR"
+
+REPORT_TIMESTAMP=$(date '+%Y-%m-%d_%H-%M-%S')
+REPORT_FILE="$REPORT_DIR/server_health_$REPORT_TIMESTAMP.txt"
+exec > >(tee "$REPORT_FILE") 2>&1
 
 echo "=========================="
 echo "   Server Health Report"
