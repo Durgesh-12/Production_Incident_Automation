@@ -1,6 +1,6 @@
-# Logs
+# Logs and runtime state
 *.log
-
+logs/
 # Reports
 reports/
 
