@@ -18,3 +18,5 @@ __pycache__/
 
 # OS files
 .DS_Store
+#jira configuration
+config/jira.conf

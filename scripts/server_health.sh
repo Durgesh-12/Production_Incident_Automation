@@ -9,6 +9,11 @@ REPORT_TIMESTAMP=$(date '+%Y-%m-%d_%H-%M-%S')
 REPORT_FILE="$REPORT_DIR/server_health_$REPORT_TIMESTAMP.txt"
 exec > >(tee "$REPORT_FILE") 2>&1
 
+LOG_DIR="$PROJECT_DIR/logs"
+HEALTH_STATUS_FILE="$LOG_DIR/health_status.env"
+
+mkdir -p "$LOG_DIR"
+
 echo "=========================="
 echo "   Server Health Report"
 echo "=========================="
@@ -35,7 +40,6 @@ elif awk -v cpu="$cpu_usage" 'BEGIN {exit !(cpu >= 75)}'; then
 else
     cpu_status="HEALTHY"
 fi
-cpu_status="WARNING"
 echo "CPU Status : $cpu_status"
 echo
 echo "Memory Usage"
@@ -106,6 +110,43 @@ service_status=$(systemctl is-active "$service_name")
 
 echo "Service        : $service_name"
 echo "Service Status : $service_status"
+
+echo
+echo "Network Monitoring"
+
+# Network Interface
+network_interface=$(ip route | awk '/default/ {print $5; exit}')
+
+if ip link show "$network_interface" | grep -q "state UP"; then
+    interface_status="HEALTHY"
+else
+    interface_status="CRITICAL"
+fi
+
+echo "Interface        : $network_interface"
+echo "Interface Status : $interface_status"
+
+# Network Connectivity
+if ping -c 3 -W 2 8.8.8.8 >/dev/null 2>&1; then
+    connectivity_status="HEALTHY"
+else
+    connectivity_status="CRITICAL"
+fi
+
+echo "Connectivity     : $connectivity_status"
+
+# Port Availability
+if nc -z localhost 22 >/dev/null 2>&1; then
+    port_status="OPEN"
+    port_health="HEALTHY"
+else
+    port_status="CLOSED"
+    port_health="CRITICAL"
+fi
+
+echo "Port             : 22"
+echo "Port Status      : $port_status"
+echo "Port Health      : $port_health"
 
 if [ "$service_status" = "active" ]; then
     service_health="HEALTHY"
@@ -184,3 +225,13 @@ fi
 echo "Incident Detected : $incident_detected"
 echo "Incident Priority : $incident_priority"
 echo "Incident Reason   : $incident_reason"
+cat > "$HEALTH_STATUS_FILE" <<EOF
+CPU_STATUS=$cpu_status
+MEMORY_STATUS=$memory_status
+DISK_STATUS=$disk_status
+LOAD_STATUS=$load_status
+SERVICE_STATUS=$service_status
+SERVICE_HEALTH=$service_health
+SERVICE_IMPORTANCE=$service_importance
+OVERALL_STATUS=$overall_status
+EOF
