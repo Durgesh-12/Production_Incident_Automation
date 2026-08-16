@@ -86,18 +86,103 @@ echo "Incident Priority : $incident_priority"
 echo "Incident Reason   : $incident_reason"
 echo
 
+STATE_FILE="$PROJECT_DIR/logs/incident_state.env"
+
 if [ "$incident_detected" = "YES" ]; then
 
-    echo "Jira Integration"
-    echo "Creating Jira incident..."
+    current_signature="${incident_priority}|${incident_reason}"
 
-    "$SCRIPT_DIR/jira_integration.sh" \
-        "$incident_priority" \
-        "$incident_reason"
+    previous_signature=""
+
+    if [ -f "$STATE_FILE" ]; then
+          previous_signature=$(grep '^INCIDENT_SIGNATURE=' "$STATE_FILE" | cut -d'"' -f2)
+          existing_jira_issue=$(grep '^JIRA_ISSUE_KEY=' "$STATE_FILE" | cut -d'"' -f2)
+    fi
+
+    if [ "$current_signature" = "$previous_signature" ]; then
+
+        echo "Jira Integration"
+        echo "Duplicate incident detected"
+        echo "Existing Jira incident : $existing_jira_issue"
+        echo "No new Jira issue created"
+
+    else
+
+        echo "Jira Integration"
+        echo "Creating Jira incident..."
+
+        jira_output=$(
+            "$SCRIPT_DIR/jira_integration.sh" \
+                "$incident_priority" \
+                "$incident_reason"
+        )
+
+        echo "$jira_output"
+
+        jira_issue_key=$(echo "$jira_output" | \
+            sed -n 's/.*Jira Issue Created : \([^ ]*\).*/\1/p')
+
+        if [ -n "$jira_issue_key" ]; then
+
+            cat > "$STATE_FILE" <<EOF
+INCIDENT_SIGNATURE="$current_signature"
+INCIDENT_PRIORITY="$incident_priority"
+INCIDENT_REASON="$incident_reason"
+JIRA_ISSUE_KEY="$jira_issue_key"
+EOF
+
+            echo "Incident state saved"
+
+        else
+            echo "WARNING: Jira issue key not found"
+            echo "Incident state not saved"
+        fi
+
+    fi
 
 else
 
     echo "Jira Integration"
-    echo "No Jira issue created"
+
+    if [ -f "$STATE_FILE" ]; then
+
+        existing_jira_issue=$(grep '^JIRA_ISSUE_KEY=' "$STATE_FILE" | cut -d'"' -f2)
+
+        if [ -n "$existing_jira_issue" ]; then
+
+            echo "Incident recovery detected"
+            echo "Existing Jira incident : $existing_jira_issue"
+            echo "Resolving Jira incident..."
+
+            resolve_output=$(
+                "$SCRIPT_DIR/jira_integration.sh" \
+                    resolve \
+                    "$existing_jira_issue"
+            )
+
+            echo "$resolve_output"
+
+            if echo "$resolve_output" | grep -q "Jira Issue Resolved"; then
+                rm -f "$STATE_FILE"
+                echo "Incident state cleared"
+            else
+                echo "WARNING: Jira issue was not resolved"
+                echo "Incident state retained"
+            fi
+
+        else
+
+            echo "No Jira issue associated with incident"
+            rm -f "$STATE_FILE"
+            echo "Incident state cleared"
+
+        fi
+
+    else
+
+        echo "No active Jira incident"
+        echo "No Jira issue created"
+
+    fi
 
 fi

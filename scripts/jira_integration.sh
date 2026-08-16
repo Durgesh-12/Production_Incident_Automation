@@ -20,18 +20,61 @@ if [ -z "$JIRA_URL" ] ||
     exit 1
 fi
 
+ACTION="${1:-create}"
+
+# ============================================================
+# RESOLVE JIRA INCIDENT
+# ============================================================
+
+if [ "$ACTION" = "resolve" ]; then
+
+    ISSUE_KEY="$2"
+
+    if [ -z "$ISSUE_KEY" ]; then
+        echo "ERROR: Jira issue key required"
+        exit 1
+    fi
+
+    echo "=========================="
+    echo "   Jira Resolution"
+    echo "=========================="
+
+    echo "Jira Issue : $ISSUE_KEY"
+    echo "Transition : Done"
+
+    PAYLOAD='{
+      "transition": {
+        "id": "41"
+      }
+    }'
+
+    response=$(curl -s -w "\nHTTP_STATUS:%{http_code}" \
+        -u "$JIRA_EMAIL:$JIRA_API_TOKEN" \
+        -H "Accept: application/json" \
+        -H "Content-Type: application/json" \
+        -X POST \
+        "$JIRA_URL/rest/api/3/issue/$ISSUE_KEY/transitions" \
+        --data "$PAYLOAD")
+
+    http_status=$(echo "$response" | sed -n 's/.*HTTP_STATUS:\([0-9]*\)$/\1/p')
+
+    if [ "$http_status" = "204" ]; then
+        echo "Jira Issue Resolved : $ISSUE_KEY"
+        echo "Status              : Done"
+        exit 0
+    else
+        echo "ERROR: Failed to resolve Jira issue"
+        echo "$response"
+        exit 1
+    fi
+fi
+
+# ============================================================
+# CREATE JIRA INCIDENT
+# ============================================================
+
 INCIDENT_PRIORITY="${1:-P2}"
 INCIDENT_REASON="${2:-Production incident detected}"
-
-SUMMARY="[$INCIDENT_PRIORITY] Production Incident Detected"
-
-DESCRIPTION="Production Incident Automation detected an incident.
-
-Priority: $INCIDENT_PRIORITY
-Reason: $INCIDENT_REASON
-
-Server: $(hostname)
-Timestamp: $(date)"
 
 PAYLOAD=$(cat <<EOF
 {

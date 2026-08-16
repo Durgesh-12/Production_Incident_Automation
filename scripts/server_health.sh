@@ -175,56 +175,9 @@ fi
 
 echo "Overall Status : $overall_status"
 echo
-echo "Incident Classification"
 
-incident_detected="NO"
-incident_priority="NONE"
-incident_reason="No incident detected"
-
-critical_count=0
-
-[ "$cpu_status" = "CRITICAL" ] && ((critical_count++))
-[ "$memory_status" = "CRITICAL" ] && ((critical_count++))
-[ "$disk_status" = "CRITICAL" ] && ((critical_count++))
-[ "$load_status" = "CRITICAL" ] && ((critical_count++))
-
-# SSH is currently treated as an important infrastructure service
 service_importance="IMPORTANT"
-if [ "$critical_count" -ge 2 ]; then
 
-    incident_detected="YES"
-    incident_priority="P1"
-    incident_reason="Multiple critical resource issues"
-
-elif [ "$service_health" = "CRITICAL" ] && [ "$service_importance" = "IMPORTANT" ]; then
-
-    incident_detected="YES"
-    incident_priority="P2"
-    incident_reason="Important service down"
-
-elif [ "$critical_count" -eq 1 ]; then
-
-    incident_detected="YES"
-    incident_priority="P2"
-    incident_reason="One critical resource issue"
-
-elif [ "$service_health" = "CRITICAL" ] && [ "$service_importance" = "NON_CRITICAL" ]; then
-
-    incident_detected="YES"
-    incident_priority="P3"
-    incident_reason="Non-critical service down"
-
-elif [ "$overall_status" = "WARNING" ]; then
-
-    incident_detected="NO"
-    incident_priority="NONE"
-    incident_reason="Warning threshold reached"
-
-fi
-
-echo "Incident Detected : $incident_detected"
-echo "Incident Priority : $incident_priority"
-echo "Incident Reason   : $incident_reason"
 cat > "$HEALTH_STATUS_FILE" <<EOF
 CPU_STATUS=$cpu_status
 MEMORY_STATUS=$memory_status
